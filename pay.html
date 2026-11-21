@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Rocco: subscribe</title>
+	<!--
+		Rocco's checkout page (plan step 6b): Paddle's "default payment link". The app's Subscribe button opens this page
+		with ?_ptxn=<transaction> on the end, and Paddle's own script opens its checkout over it. Nothing secret is here:
+		a client-side token is public by design. The secret API key lives only on the server.
+	-->
+	<style>
+		body { margin: 0; min-height: 100vh; display: grid; place-items: center; font: 16px/1.5 "Segoe UI", system-ui, sans-serif; background: #11151b; color: #e6e9ee; }
+		main { max-width: 34rem; padding: 2rem; text-align: center; }
+		h1 { font-size: 1.6rem; margin: 0 0 .5rem; }
+		p { color: #9aa3b2; }
+	</style>
+	<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+</head>
+<body>
+	<main>
+		<h1>Rocco</h1>
+		<p id="say">Opening the checkout…</p>
+	</main>
+	<script>
+		// Fill these in from Paddle: Developer tools > Authentication > Client-side tokens. Sandbox tokens start test_.
+		const PADDLE_ENV = 'sandbox';
+		const PADDLE_CLIENT_TOKEN = 'PUT_THE_CLIENT_SIDE_TOKEN_HERE';
+
+		const say = (text) => { document.getElementById('say').textContent = text; };
+		if (!new URLSearchParams(location.search).get('_ptxn')) {
+			say('Open this page from Rocco\'s Subscribe button.');
+		} else {
+			if (PADDLE_ENV === 'sandbox') Paddle.Environment.set('sandbox');
+			Paddle.Initialize({
+				token: PADDLE_CLIENT_TOKEN,
+				eventCallback: (e) => {
+					if (e.name === 'checkout.completed') say('Thank you! Go back to Rocco and click Check again.');
+					if (e.name === 'checkout.closed') say('Checkout closed. You can close this tab.');
+				},
+			});
+		}
+	</script>
+</body>
+</html>
