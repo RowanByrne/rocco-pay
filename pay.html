@@ -3,42 +3,219 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Rocco: subscribe</title>
+	<title>Rocco Pro</title>
 	<!--
-		Rocco's checkout page (plan step 6b): Paddle's "default payment link". The app's Subscribe button opens this page
-		with ?_ptxn=<transaction> on the end, and Paddle's own script opens its checkout over it. Nothing secret is here:
-		a client-side token is public by design. The secret API key lives only on the server.
+		Rocco's checkout page: Paddle's "default payment link". Go Pro in the app makes a Paddle transaction on the server
+		and opens this page with ?_ptxn=<transaction> in a small window of Rocco's own (with &in=app), or in the browser.
+		Paddle's checkout sits inside the page ("inline"): the order summary and everything around it are ours, drawn
+		from what Paddle reports; the card form is Paddle's, set to its dark theme. Nothing secret is here: a client-side
+		token is public by design, and the secret API key lives only on the server.
+
+		The app's window watches for #paid (the payment went through) and unlocks Pro straight away. "Pay in your
+		browser instead" opens this same page in the browser, where saved cards and wallets work.
+
+		Kept in two places, the same: here (try-rocco.com/pay) and the public repo RowanByrne/rocco-pay (GitHub Pages),
+		which is the link Paddle and the app use. assets/ (the font and the logo) goes with it.
 	-->
 	<style>
-		body { margin: 0; min-height: 100vh; display: grid; place-items: center; font: 16px/1.5 "Segoe UI", system-ui, sans-serif; background: #11151b; color: #e6e9ee; }
-		main { max-width: 34rem; padding: 2rem; text-align: center; }
-		h1 { font-size: 1.6rem; margin: 0 0 .5rem; }
-		p { color: #9aa3b2; }
+		@font-face { font-family: "Inter"; src: url("assets/fonts/inter-latin-wght-normal.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+		:root {
+			--bg: #070605; --panel: #12100e; --panel-2: #1c1916; --edge: #2c2722;
+			--text: #f6f1ea; --body: #d3ccc2; --muted: #a9a196; --faint: #8a8278;
+			--ember: #ea8a42; --ember-2: #f0a15e; --on-ember: #1a120b; --green: #4bd093;
+			color-scheme: dark;
+		}
+		* { box-sizing: border-box; }
+		html, body { margin: 0; }
+		body {
+			min-height: 100vh; background: radial-gradient(120% 60% at 50% -10%, rgba(234, 138, 66, .10), transparent 60%), var(--bg);
+			color: var(--body); font: 15px/1.5 "Inter", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+		}
+		.page { max-width: 920px; margin: 0 auto; padding: 22px 20px 28px; display: grid; gap: 18px; }
+		.top { display: flex; align-items: center; gap: 12px; }
+		.top img { width: 38px; height: 38px; border-radius: 9px; }
+		.top b { display: block; color: var(--text); font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
+		.top span { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12.5px; }
+		.top svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.2; }
+		.cols { display: grid; gap: 18px; align-items: start; }
+		@media (min-width: 760px) { .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 28px; } }
+
+		.card { background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 16px 18px; }
+		.plan { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+		.plan b { color: var(--text); font-size: 16px; font-weight: 650; }
+		.plan .price { color: var(--text); font-size: 16px; font-weight: 600; white-space: nowrap; }
+		.plan .price small { color: var(--muted); font-weight: 400; font-size: 13px; }
+		.ticks { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); }
+		.ticks li { display: flex; gap: 8px; align-items: baseline; }
+		.ticks li::before { content: ""; flex: none; width: 6px; height: 10px; margin: 0 2px; border: solid var(--ember); border-width: 0 2px 2px 0; transform: translateY(-1px) rotate(45deg); }
+		.lines { margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid var(--edge); display: grid; gap: 6px; font-size: 13.5px; }
+		.line { display: flex; justify-content: space-between; gap: 12px; }
+		.line span:last-child { font-variant-numeric: tabular-nums; }
+		.line.off span:last-child { color: var(--green); }
+		.line.total { margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--edge); color: var(--text); font-weight: 650; font-size: 15px; }
+		.then { margin: 10px 0 0; color: var(--muted); font-size: 12.5px; }
+		.sk { display: inline-block; height: .9em; width: 4.5em; border-radius: 4px; background: linear-gradient(90deg, var(--panel-2), #26221e, var(--panel-2)); background-size: 200% 100%; animation: sk 1.4s ease-in-out infinite; vertical-align: middle; }
+		@keyframes sk { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+		/* Paddle's form (an iframe it puts here and sizes itself). */
+		.checkout { min-height: 420px; position: relative; }
+		.checkout .wait { position: absolute; inset: 0; display: grid; gap: 10px; align-content: start; }
+		.checkout .wait i { display: block; height: 44px; border-radius: 8px; background: linear-gradient(90deg, var(--panel), var(--panel-2), var(--panel)); background-size: 200% 100%; animation: sk 1.4s ease-in-out infinite; }
+		.checkout .wait i.b { background: rgba(234, 138, 66, .25); }
+		.checkout.ready .wait { display: none; }
+
+		.say { margin: 0; color: var(--muted); font-size: 13.5px; text-align: center; }
+		.say:empty { display: none; }
+		.foot { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; color: var(--faint); font-size: 12.5px; }
+		.foot a { color: var(--muted); }
+		.foot a:hover { color: var(--text); }
+
+		.done { min-height: 70vh; display: grid; place-content: center; justify-items: center; text-align: center; gap: 10px; }
+		.done .tick { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: rgba(75, 208, 147, .14); border: 1px solid rgba(75, 208, 147, .4); }
+		.done .tick svg { width: 30px; height: 30px; fill: none; stroke: var(--green); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+		.done h1 { margin: 6px 0 0; color: var(--text); font-size: 22px; font-weight: 650; letter-spacing: -.01em; }
+		.done p { margin: 0; max-width: 32ch; color: var(--muted); }
+		[hidden] { display: none !important; }
 	</style>
 	<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 </head>
 <body>
-	<main>
-		<h1>Rocco</h1>
-		<p id="say">Opening the checkout…</p>
+	<main class="page" id="pay">
+		<header class="top">
+			<img src="assets/rocco.svg" alt="">
+			<div><b>Rocco Pro</b><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Secure checkout by Paddle</span></div>
+		</header>
+		<div class="cols">
+			<section class="card" aria-label="Your order">
+				<div class="plan"><b id="plan">Rocco Pro</b><span class="price" id="price"><span class="sk"></span></span></div>
+				<ul class="ticks">
+					<li>Every game open at once</li>
+					<li>Rocco on all your PCs</li>
+					<li>90 days of chat</li>
+				</ul>
+				<div class="lines">
+					<div class="line"><span>Subtotal</span><span id="subtotal"><span class="sk"></span></span></div>
+					<div class="line off" id="discountRow" hidden><span id="discountName">Discount</span><span id="discount"></span></div>
+					<div class="line"><span>Tax</span><span id="tax"><span class="sk"></span></span></div>
+					<div class="line total"><span>Due today</span><span id="total"><span class="sk"></span></span></div>
+				</div>
+				<p class="then" id="then">Cancel any time from Rocco's Settings.</p>
+			</section>
+			<div>
+				<div class="checkout" id="checkout"><div class="wait" aria-hidden="true"><i></i><i></i><i></i><i class="b"></i></div></div>
+			</div>
+		</div>
+		<p class="say" id="say" role="status"></p>
+		<footer class="foot">
+			<a id="browser" href="#" target="_blank" rel="noopener" hidden>Pay in your browser instead</a>
+			<span>Paddle handles the payment, so Rocco never sees your card.</span>
+		</footer>
 	</main>
+	<section class="done" id="done" hidden>
+		<div class="tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+		<h1>You're on Pro</h1>
+		<p id="doneSay">Thank you. Go back to Rocco: it unlocks Pro within a minute.</p>
+	</section>
 	<script>
-		// Fill these in from Paddle: Developer tools > Authentication > Client-side tokens. Sandbox tokens start test_.
+		// From Paddle: Developer tools > Authentication > Client-side tokens. Sandbox tokens start test_.
 		const PADDLE_ENV = 'sandbox';
 		const PADDLE_CLIENT_TOKEN = 'test_0ad9a01c62a64190629e8f5f09d';
 
-		const say = (text) => { document.getElementById('say').textContent = text; };
-		if (!new URLSearchParams(location.search).get('_ptxn')) {
-			say('Open this page from Rocco\'s Subscribe button.');
+		const $ = (id) => document.getElementById(id);
+		const say = (text) => { $('say').textContent = text; };
+		const q = new URLSearchParams(location.search);
+		const inApp = q.get('in') === 'app';
+		// Trying the page on this PC (node dev/pay-preview.mjs): a sandbox checkout from a price, with no transaction.
+		const preview = PADDLE_ENV === 'sandbox' && ['localhost', '127.0.0.1'].includes(location.hostname) ? q.get('preview') : null;
+		const PREVIEW_PRICES = { monthly: 'pri_01m87gzrq0pztphx0mxp1fr4n7', yearly: 'pri_01m87h0dernx1ymr1jzy7d9191' };
+
+		// In Rocco's window: the same page in the browser, for saved cards and wallets.
+		if (inApp) {
+			const out = new URL(location.href);
+			out.searchParams.delete('in');
+			out.hash = '';
+			$('browser').href = out.toString();
+			$('browser').hidden = false;
+		} else {
+			$('doneSay').textContent = 'Thank you. You can close this tab: Rocco unlocks Pro within a minute.';
+		}
+
+		const money = (n, cur) => {
+			const v = Number(n);
+			if (!Number.isFinite(v)) return '';
+			try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur || 'USD' }).format(v); } catch { return `${v.toFixed(2)} ${cur || ''}`.trim(); }
+		};
+		const every = (cycle) => {
+			if (!cycle?.interval) return '';
+			const n = Number(cycle.frequency) || 1;
+			return n === 1 ? `a ${cycle.interval}` : `every ${n} ${cycle.interval}s`;
+		};
+
+		// The summary, from what Paddle says the checkout holds now (it changes with country, tax and promo codes).
+		function show(data) {
+			if (!data) return;
+			const cur = data.currency_code;
+			const item = data.items?.[0];
+			const cycle = item?.billing_cycle;
+			const t = data.totals || {};
+			if (cycle?.interval) $('plan').textContent = cycle.interval === 'year' ? 'Rocco Pro, yearly' : 'Rocco Pro, monthly';
+			const each = item?.totals?.subtotal ?? t.subtotal;
+			$('price').replaceChildren(money(each, cur), Object.assign(document.createElement('small'), { textContent: cycle ? ` ${every(cycle).replace(/^a /, '/ ')}` : '' }));
+			$('subtotal').textContent = money(t.subtotal, cur);
+			$('tax').textContent = Number(t.tax) ? money(t.tax, cur) : money(0, cur);
+			$('total').textContent = money(t.total, cur);
+			const off = Number(t.discount);
+			$('discountRow').hidden = !off;
+			if (off) {
+				$('discountName').textContent = data.discount?.code ? `Promo code ${data.discount.code}` : 'Discount';
+				$('discount').textContent = `−${money(off, cur)}`;
+			}
+			const next = data.recurring_totals?.total;
+			$('then').textContent = next != null && cycle
+				? `Then ${money(next, cur)} ${every(cycle)}${Number(t.tax) || Number(data.recurring_totals?.tax) ? ', with tax' : ''}. Cancel any time from Rocco's Settings.`
+				: "Cancel any time from Rocco's Settings.";
+		}
+
+		function paid() {
+			$('pay').hidden = true;
+			$('done').hidden = false;
+			if (inApp) {
+				$('doneSay').textContent = 'Thank you. Rocco is unlocking Pro now, and this window closes by itself.';
+				location.hash = 'paid'; // Rocco's window watches for this
+			}
+		}
+
+		const settings = {
+			displayMode: 'inline',
+			frameTarget: 'checkout',
+			frameInitialHeight: 450,
+			frameStyle: 'width: 100%; min-width: 312px; background-color: transparent; border: none;',
+			theme: 'dark',
+			variant: 'one-page',
+			allowLogout: false,
+		};
+
+		if (!q.get('_ptxn') && !preview) {
+			$('checkout').hidden = true;
+			document.querySelector('.card').hidden = true;
+			say('Open this page from Go Pro in Rocco.');
 		} else {
 			if (PADDLE_ENV === 'sandbox') Paddle.Environment.set('sandbox');
 			Paddle.Initialize({
 				token: PADDLE_CLIENT_TOKEN,
+				// The default payment link (?_ptxn=) opens with these, inside the page.
+				checkout: { settings },
 				eventCallback: (e) => {
-					if (e.name === 'checkout.completed') say('Thank you! Go back to Rocco and click Check again.');
-					if (e.name === 'checkout.closed') say('Checkout closed. You can close this tab.');
+					if (e.name === 'checkout.loaded') { $('checkout').classList.add('ready'); show(e.data); }
+					else if (e.name === 'checkout.updated' || e.name === 'checkout.customer.created' || e.name === 'checkout.customer.updated'
+						|| e.name === 'checkout.discount.applied' || e.name === 'checkout.discount.removed' || e.name === 'checkout.payment.selected') show(e.data);
+					else if (e.name === 'checkout.payment.initiated') say('Paying…');
+					else if (e.name === 'checkout.payment.failed') say('That payment didn\'t go through. Check the details, or try another way to pay.');
+					else if (e.name === 'checkout.completed') paid();
+					else if (e.name === 'checkout.error') say('Paddle\'s checkout had a problem. Close this and try Go Pro again.');
 				},
 			});
+			if (preview) Paddle.Checkout.open({ items: [{ priceId: PREVIEW_PRICES[preview] || PREVIEW_PRICES.monthly, quantity: 1 }], settings });
 		}
 	</script>
 </body>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 256 256" role="img" aria-labelledby="rocco-ember-title">
+  <title id="rocco-ember-title">Rocco — Slipstream Ember</title>
+  <defs>
+    <linearGradient id="rocco-ember-tile" x1="35" y1="18" x2="218" y2="242" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#201D1A"/>
+      <stop offset="1" stop-color="#131110"/>
+    </linearGradient>
+    <linearGradient id="rocco-ember-card" x1="102" y1="69" x2="175" y2="193" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F0A15E"/>
+      <stop offset="1" stop-color="#EA8A42"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#rocco-ember-tile)"/>
+  <rect x="8.5" y="8.5" width="239" height="239" rx="55.5" fill="none" stroke="#FFF4E6" opacity=".2"/>
+  <path d="M113 79l84-18c11-2 19 5 17 16l-19 87c-1 7-6 11-13 13l-91 20c-11 2-19-5-16-16l5-20-30 7c-6 1-10-3-9-8 1-4 4-7 8-8l35-8 4-18-49 11c-6 1-10-3-9-8 1-4 4-7 8-8l54-12 3-16c2-9 8-13 18-14Z" transform="translate(0 6)" fill="#000000" opacity=".44"/>
+  <path d="M113 79l84-18c11-2 19 5 17 16l-19 87c-1 7-6 11-13 13l-91 20c-11 2-19-5-16-16l5-20-30 7c-6 1-10-3-9-8 1-4 4-7 8-8l35-8 4-18-49 11c-6 1-10-3-9-8 1-4 4-7 8-8l54-12 3-16c2-9 8-13 18-14Z" fill="url(#rocco-ember-card)"/>
+  <path d="m118 114 62-14" fill="none" stroke="#201206" stroke-width="14" stroke-linecap="round"/>
+</svg>
