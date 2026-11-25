@@ -6,13 +6,12 @@
 	<title>Rocco Pro</title>
 	<!--
 		Rocco's checkout page: Paddle's "default payment link". Go Pro in the app makes a Paddle transaction on the server
-		and opens this page with ?_ptxn=<transaction> in a small window of Rocco's own (with &in=app), or in the browser.
+		and opens this page with ?_ptxn=<transaction> in the person's own browser, where saved cards and wallets work.
 		Paddle's checkout sits inside the page ("inline"): the order summary and everything around it are ours, drawn
 		from what Paddle reports; the card form is Paddle's, set to its dark theme. Nothing secret is here: a client-side
 		token is public by design, and the secret API key lives only on the server.
 
-		The app's window watches for #paid (the payment went through) and unlocks Pro straight away. "Pay in your
-		browser instead" opens this same page in the browser, where saved cards and wallets work.
+		The app watches for the subscription itself (every few seconds after opening this), so this page only says thanks.
 
 		Kept in two places, the same: here (try-rocco.com/pay) and the public repo RowanByrne/rocco-pay (GitHub Pages),
 		which is the link Paddle and the app use. assets/ (the font and the logo) goes with it.
@@ -38,7 +37,7 @@
 		.top span { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12.5px; }
 		.top svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.2; }
 		.cols { display: grid; gap: 18px; align-items: start; }
-		@media (min-width: 760px) { .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 28px; } }
+		@media (min-width: 760px) { .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 28px; } .cols > .card { position: sticky; top: 20px; } }
 
 		.card { background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 16px 18px; }
 		.plan { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
@@ -107,14 +106,13 @@
 		</div>
 		<p class="say" id="say" role="status"></p>
 		<footer class="foot">
-			<a id="browser" href="#" target="_blank" rel="noopener" hidden>Pay in your browser instead</a>
 			<span>Paddle handles the payment, so Rocco never sees your card.</span>
 		</footer>
 	</main>
 	<section class="done" id="done" hidden>
 		<div class="tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
 		<h1>You're on Pro</h1>
-		<p id="doneSay">Thank you. Go back to Rocco: it unlocks Pro within a minute.</p>
+		<p>Thank you. Rocco unlocks Pro in a few seconds, so you can close this tab and go back to it.</p>
 	</section>
 	<script>
 		// From Paddle: Developer tools > Authentication > Client-side tokens. Sandbox tokens start test_.
@@ -124,21 +122,9 @@
 		const $ = (id) => document.getElementById(id);
 		const say = (text) => { $('say').textContent = text; };
 		const q = new URLSearchParams(location.search);
-		const inApp = q.get('in') === 'app';
 		// Trying the page on this PC (node dev/pay-preview.mjs): a sandbox checkout from a price, with no transaction.
 		const preview = PADDLE_ENV === 'sandbox' && ['localhost', '127.0.0.1'].includes(location.hostname) ? q.get('preview') : null;
 		const PREVIEW_PRICES = { monthly: 'pri_01m87gzrq0pztphx0mxp1fr4n7', yearly: 'pri_01m87h0dernx1ymr1jzy7d9191' };
-
-		// In Rocco's window: the same page in the browser, for saved cards and wallets.
-		if (inApp) {
-			const out = new URL(location.href);
-			out.searchParams.delete('in');
-			out.hash = '';
-			$('browser').href = out.toString();
-			$('browser').hidden = false;
-		} else {
-			$('doneSay').textContent = 'Thank you. You can close this tab: Rocco unlocks Pro within a minute.';
-		}
 
 		const money = (n, cur) => {
 			const v = Number(n);
@@ -179,10 +165,7 @@
 		function paid() {
 			$('pay').hidden = true;
 			$('done').hidden = false;
-			if (inApp) {
-				$('doneSay').textContent = 'Thank you. Rocco is unlocking Pro now, and this window closes by itself.';
-				location.hash = 'paid'; // Rocco's window watches for this
-			}
+			scrollTo(0, 0);
 		}
 
 		const settings = {
